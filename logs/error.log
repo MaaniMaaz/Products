@@ -354,3 +354,4 @@
 {"date":"2024-12-05T07:04:38.335Z","level":"error","message":"country is not defined","method":"GET","service":"user-service","url":"/?season=&league=&city=&page=1&limit=7"}
 {"date":"2024-12-05T07:04:40.356Z","level":"error","message":"country is not defined","method":"GET","service":"user-service","url":"/?season=&league=&city=&page=1&limit=7"}
 {"date":"2024-12-05T07:22:19.273Z","level":"error","message":"League is required","method":"POST","service":"user-service","url":"/player-standing"}
+{"date":"2025-09-08T09:21:45.377Z","level":"error","message":"User does not exist","method":"POST","service":"user-service","url":"/login"}
