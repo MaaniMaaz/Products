@@ -8,9 +8,17 @@ const fs = require('fs');
 const path = require('path');
 const Papa = require('papaparse'); // Better alternative for CSV parsing
 const { Readable } = require('stream');
+const mongoose = require("mongoose");
 
 const createProductByCsv = async (req, res) => {
   try {
+    const { warehouse } = req.body;
+    
+    // Validate warehouse ID
+    if (!warehouse) {
+      return ErrorHandler("Warehouse ID is required", 400, req, res);
+    }
+    
     // Debug: Log the request files structure
     console.log('req.files:', req.files);
     
@@ -58,11 +66,24 @@ const createProductByCsv = async (req, res) => {
       return ErrorHandler("Unable to read uploaded file", 400, req, res);
     }
 
+    // Function to convert scientific notation to string
+    const formatUPC = (value) => {
+      if (!value) return null;
+      // Convert to string first, then check if it's in scientific notation
+      const strValue = String(value).trim();
+      if (strValue.includes('E') || strValue.includes('e')) {
+        // Parse as number and convert back to string without scientific notation
+        const num = parseFloat(strValue);
+        return Math.round(num).toString();
+      }
+      return strValue;
+    };
+
     // Parse CSV using Papa Parse
     const parseResult = Papa.parse(csvData, {
       header: true, // First row as headers
       skipEmptyLines: true,
-      dynamicTyping: false, // Keep as strings
+      dynamicTyping: false, // Keep as strings to prevent scientific notation
       transform: (value) => value.trim() // Trim whitespace
     });
 
@@ -71,15 +92,32 @@ const createProductByCsv = async (req, res) => {
       return ErrorHandler("Error parsing CSV file", 400, req, res);
     }
 
-    // Extract ASINs from parsed data
+    // Extract ASINs and map CSV extras (mqc, upc) by ASIN
     const asins = [];
+    const asinToExtras = {};
     parseResult.data.forEach((row) => {
       console.log(row);
       
       // Check multiple possible column names for ASIN
-      const asin = row["AMZ URL"] || row.ASIN || row.Asin || row.amazon_asin || row.product_asin;
-      if (asin && asin.trim()) {
-        asins.push(asin.trim());
+      const asinRaw = row["AMZ URL"] || row.ASIN || row.Asin || row.amazon_asin || row.product_asin;
+      const asin = asinRaw && typeof asinRaw === 'string' ? asinRaw.trim() : asinRaw;
+
+      // Extract mqc/moc and upc from CSV using flexible header names
+      const mqcRaw = row.MQC || row.mqc || row.MOC || row.moc || row.MOQ || row.moq;
+      const upcRaw = row.UPC || row.upc || row.Upc;
+      const unitCost = row["Unit Cost"] 
+      const mqc = typeof mqcRaw === 'string' ? mqcRaw.trim() : mqcRaw;
+      const upc = formatUPC(upcRaw); // Use the formatting function
+      const unitCostPrice = typeof unitCost === 'string' ? unitCost.trim() : unitCost;
+
+      if (asin && String(asin).trim()) {
+        const asinKey = String(asin).trim();
+        asins.push(asinKey);
+        asinToExtras[asinKey] = {
+          mqc: mqc ?? null,
+          upc: upc ?? null,
+          unitCost : unitCostPrice ?? null
+        };
       }
     });
 
@@ -91,13 +129,13 @@ const createProductByCsv = async (req, res) => {
 
     // Fetch product data from API
     const apiResponse = await axios.post(
-      `https://app.apexapplications.com/api/data/get-asins-info`,
+      `https://app.apexapplications.io/api/data/get-asins-info`,
       { asins: asins },
       { headers }
     );
 
     const productsData = apiResponse.data;
-console.log(productsData ,"productdata");
+    console.log(productsData ,"productdata");
 
     // Save products to database
     const savedProducts = [];
@@ -106,13 +144,16 @@ console.log(productsData ,"productdata");
       // Assuming you have a Product model/schema
       // Adjust the fields based on your database schema and API response structure
       const productToSave = {
+        warehouse: warehouse,
         asin: productData.asin,
-        title: productData.title,
-        price: productData.price,
-        description: productData.description,
-        imageUrl: productData.image_url,
+        name: productData.title,
+        price: asinToExtras[productData.asin]?.unitCost || null,
+        images: productData.image,
         brand: productData.brand,
-        category: productData.category,
+        amazonBb: productData.price,
+        amazonFees: productData.fees, // FIXED: Changed from productsData.fees to productData.fees
+        mqc: asinToExtras[productData.asin]?.mqc || null,
+        upc: asinToExtras[productData.asin]?.upc || null,
         // Add other fields as needed
         createdAt: new Date(),
         updatedAt: new Date()
@@ -202,34 +243,92 @@ const deleteProduct = async (req, res) => {
   }
 };
 
-// Get All Products
+// Get All Products (with aggregation + pagination)
 const getAllProducts = async (req, res) => {
   // #swagger.tags = ['product']
   try {
-    const { title, warehouse, brand } = req.query;
+    const { title, warehouse, brand, page = 1, limit = 10 } = req.query;
 
-    // Build query dynamically
-    const query = {};
+    // Convert pagination values to numbers
+    const pageNumber = Math.max(parseInt(page), 1);
+    const pageSize = Math.max(parseInt(limit), 1);
+    const skip = (pageNumber - 1) * pageSize;
+
+    // Build match conditions dynamically
+    const matchStage = {};
 
     if (title) {
-      query.name = { $regex: title, $options: "i" }; // case-insensitive search
+      matchStage.name = { $regex: title, $options: "i" };
     }
 
     if (brand) {
-      query.brand = { $regex: brand, $options: "i" };
+      matchStage.brand = { $regex: brand, $options: "i" };
     }
 
+    // Warehouse filter: support both ObjectId and warehouse name (via lookup)
+    let warehouseNameFilter = null;
     if (warehouse) {
-      query.warehouse = { $regex: warehouse, $options: "i" };
+      if (mongoose.Types.ObjectId.isValid(warehouse)) {
+        matchStage.warehouse = new mongoose.Types.ObjectId(warehouse);
+      } else {
+        warehouseNameFilter = warehouse; // will apply after $lookup
+      }
     }
 
-    const products = await Product.find(query).sort({ createdAt: -1 });
+    // Aggregation pipeline
+    const pipeline = [
+      { $match: matchStage },
+      {
+        $lookup: {
+          from: 'warehouses',
+          localField: 'warehouse',
+          foreignField: '_id',
+          as: 'warehouseDoc'
+        }
+      },
+      { $unwind: { path: '$warehouseDoc', preserveNullAndEmptyArrays: true } },
+      // Optional filter by warehouse name if provided as text
+      ...(warehouseNameFilter
+        ? [{ $match: { 'warehouseDoc.name': { $regex: warehouseNameFilter, $options: 'i' } } }]
+        : []),
+      { $sort: { createdAt: -1 } },
+      {
+        $facet: {
+          data: [
+            { $skip: skip },
+            { $limit: pageSize }
+          ],
+          totalCount: [
+            { $count: 'count' }
+          ]
+        }
+      }
+    ];
 
-    return SuccessHandler({ products }, 200, res);
+    const result = await Product.aggregate(pipeline);
+
+    const products = result[0]?.data || [];
+    const total = result[0]?.totalCount[0]?.count || 0;
+    const totalPages = Math.ceil(total / pageSize);
+
+    return SuccessHandler(
+      {
+        products,
+        pagination: {
+          total,
+          page: pageNumber,
+          limit: pageSize,
+          totalPages,
+        },
+      },
+      200,
+      res
+    );
   } catch (error) {
     return ErrorHandler(error.message, 500, req, res);
   }
 };
+
 
 
 // Get Single Product

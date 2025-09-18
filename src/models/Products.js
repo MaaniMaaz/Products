@@ -3,52 +3,54 @@ const { Schema } = mongoose;
 
 const productsSchema = new Schema(
   {
-    
+    warehouse: {
+      type: Schema.Types.ObjectId,
+      ref: "Warehouse",
+    },
     name: {
       type:String,
-      required:true
     },
     images:[],
     brand:{
        type:String,
-      required:true
+       default:"-"
     },
     mqc:{
        type:String,
-      required:true
+      default:"-"
     },
     upc:{
        type:String,
-      required:true
+       default:"-"
     },
     asin:{
        type:String,
-      required:true
+       default:"-"
     },
     amazonBb:{
        type:String,
-      required:true
+       default:"-"
     },
     amazonFees:{
        type:String,
-      required:true
+       default:"-"
     },
     profit:{
        type:String,
-      required:true
+       default:"-"
     },
     margin:{
        type:String,
-      required:true
+       default:"-"
     },
     roi:{
        type:String,
-      required:true
+       default:"-"
     },
     
     price: {
       type:String,
-      required:true
+       default:"-"
     },
     
   },

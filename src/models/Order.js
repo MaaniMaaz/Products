@@ -21,7 +21,7 @@ const orderSchema = new Schema(
           min: 1,
         },
         unitPrice: {
-          type: Number,
+          type: String,
           required: true,
         },
       },
@@ -38,6 +38,10 @@ const orderSchema = new Schema(
     tax: {
       type: String,
       default: "0",
+    },
+    status: {
+      type: String,
+      default: "pending",
     },
     totalPrice: {
       type: String,
