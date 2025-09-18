@@ -1,5 +1,6 @@
 // order.controller.js
 const Order = require("../models/Order");
+const sendOrderConfirmationMail = require("../utils/SendOrderConfirmMail");
 
 // Create Order
 const createOrder = async (req, res) => {
@@ -235,10 +236,26 @@ const updateOrderStatus = async (req, res) => {
       return res.status(404).json({ success: false, message: "Order not found" });
     }
 
-    return res.status(200).json({ success: true, message: "Order status updated", order });
+    console.log(status , order?.user?.email);
+    
+    // Send confirmation email only when status is confirmed
+    if (status === "confirmed" && order.user?.email) {
+      await sendOrderConfirmationMail(
+        order.user.email,
+        order._id.toString().slice(0, 8),
+        order.user.name || "Customer"
+      );
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Order status updated",
+      order,
+    });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
+
 
 module.exports = { createOrder,getAllOrders , getMyOrders,updateOrderStatus };

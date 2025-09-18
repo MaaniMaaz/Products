@@ -7,7 +7,7 @@ dotenv.config({ path: "./src/config/config.env" });
 const sendGoogleOtpMail = async (recipientEmail, otp , type) => {
   try {
     const mailOptions = {
-      from: `"Deniel Assistance" <${process.env.EMAIL}>`,
+      from: `"Primewell" <${process.env.EMAIL}>`,
       to: recipientEmail,
       subject: "Your OTP Code",
       text: `Your OTP code is: ${otp}`,
@@ -78,12 +78,12 @@ const sendGoogleOtpMail = async (recipientEmail, otp , type) => {
 <body>
     <div class="container">
         <div class="header">
-            <div class="logo">🏥 Deniel Assistance</div>
+            <div class="logo">🏥 Primewell</div>
             <h2>Your ${type} Verification Code</h2>
         </div>
         
         <p>Hello,</p>
-        <p>You requested to ${type} to your Deniel Assistance account. Please use the verification code below:</p>
+        <p>You requested to ${type} to your Primewell account. Please use the verification code below:</p>
         
         <div class="code-container">
             <div>Your verification code is:</div>
@@ -100,8 +100,8 @@ const sendGoogleOtpMail = async (recipientEmail, otp , type) => {
         <p>If you're having trouble ${type}, please contact our support team.</p>
         
         <div class="footer">
-            <p>This is an automated message from Deniel Assistance.</p>
-            <p>&copy; 2025 Deniel Assistance. All rights reserved.</p>
+            <p>This is an automated message from Primewell.</p>
+            <p>&copy; 2025 Primewell. All rights reserved.</p>
         </div>
     </div>
 </body>

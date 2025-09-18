@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Order Confirmation</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #f4f4f4;
+    }
+    .container {
+      background: white;
+      padding: 40px;
+      border-radius: 10px;
+      box-shadow: 0 0 20px rgba(0,0,0,0.1);
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+    .logo {
+      font-size: 28px;
+      font-weight: bold;
+      color: #036958;
+      margin-bottom: 10px;
+    }
+    .order-container {
+      background: #e5faf4;
+      border: 2px dashed #036958;
+      border-radius: 8px;
+      padding: 30px;
+      text-align: center;
+      margin: 30px 0;
+    }
+    .order-id {
+      font-size: 24px;
+      font-weight: bold;
+      color: #036958;
+      margin: 10px 0;
+    }
+    .footer {
+      margin-top: 30px;
+      padding-top: 20px;
+      border-top: 1px solid #eee;
+      font-size: 14px;
+      color: #666;
+      text-align: center;
+    }
+    .summary {
+      background: #f9f9f9;
+      border: 1px solid #eee;
+      border-radius: 5px;
+      padding: 15px;
+      margin: 20px 0;
+    }
+    .summary p {
+      margin: 5px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="logo">🛒 Deniel Assistance</div>
+      <h2>Your Order is Confirmed!</h2>
+    </div>
+
+    <p>Hello <strong><%= customerName %></strong>,</p>
+    <p>Thank you for shopping with us! Your order has been successfully confirmed. Here are the details:</p>
+
+    <div class="order-container">
+      <div>Your Order ID:</div>
+      <div class="order-id"><%= orderId %></div>
+      <div style="font-size: 14px; color: #666; margin-top: 10px;">
+        Placed on <%= orderDate %>
+      </div>
+    </div>
+
+    <div class="summary">
+      <p><strong>Order Summary:</strong></p>
+      <p>Items: <%= totalItems %></p>
+      <p>Total Amount: <strong>$<%= totalAmount %></strong></p>
+      <p>Shipping Address: <%= shippingAddress %></p>
+    </div>
+
+    <p>We’ll send you another email once your order has been shipped.</p>
+    <p>If you have any questions, please contact our support team.</p>
+
+    <div class="footer">
+      <p>This is an automated message from Deniel Assistance.</p>
+      <p>&copy; 2025 Deniel Assistance. All rights reserved.</p>
+    </div>
+  </div>
+</body>
+</html>
