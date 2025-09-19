@@ -375,3 +375,5 @@
 {"date":"2025-09-18T11:54:03.014Z","level":"error","message":"mongoose is not defined","method":"GET","service":"user-service","url":"/?title=&warehouse=68cbe84cf543bddf7c3f8160&page=1&limit=6"}
 {"date":"2025-09-18T11:54:05.554Z","level":"error","message":"mongoose is not defined","method":"GET","service":"user-service","url":"/?title=&warehouse=68cbe84cf543bddf7c3f8160&page=1&limit=6"}
 {"date":"2025-09-18T11:54:17.577Z","level":"error","message":"mongoose is not defined","method":"GET","service":"user-service","url":"/?title=&warehouse=68cbe84cf543bddf7c3f8160&page=1&limit=6"}
+{"date":"2025-09-19T10:15:14.515Z","level":"error","message":"User does not exist","method":"POST","service":"user-service","url":"/login"}
+{"date":"2025-09-19T11:37:32.984Z","level":"error","message":"Unknown API key *********","method":"PUT","service":"user-service","url":"/profile"}

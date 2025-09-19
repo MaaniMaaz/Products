@@ -200,57 +200,69 @@ const updatePassword = async (req, res) => {
   }
 };
 
+
 const updateProfile = async (req, res) => {
   // #swagger.tags = ['auth']
-
   try {
     const data = req.body;
+    const { id } = req.user;
 
-    const user = await User.findById(req.user.id);
+    console.log(id, data, "update profile request");
+
+    // Always use _id consistently
+    const user = await User.findById(id);
     if (!user) {
       return ErrorHandler("User does not exist", 400, req, res);
     }
 
-
     if (data.password) {
-      return ErrorHandler(
-        "Password cannot be updated here",
-        400,
-        req,
-        res
-      );
+      return ErrorHandler("Password cannot be updated here", 400, req, res);
     }
 
     // Check if email is being changed and validate
     if (data.email && data.email !== user.email) {
       const existingUser = await User.findOne({ email: data.email });
       if (existingUser && existingUser._id.toString() !== user._id.toString()) {
-        return ErrorHandler(
-          "Email is already in use by another user",
-          400,
-          req,
-          res
-        );
+        return ErrorHandler("Email is already in use by another user", 400, req, res);
       }
     }
 
-    // For simple profile updates (name, email), just update those fields
+    // Collect fields that are allowed to update
     const updateData = {};
     if (data.name) updateData.name = data.name;
     if (data.email) updateData.email = data.email;
+    if (data.phone) updateData.phone = data.phone;
+    if (data.address) updateData.address = data.address;
+    if (data.bio) updateData.bio = data.bio;
 
-    const updated = await User.findByIdAndUpdate(
-      req.user._id,
-      updateData,
-      {
-        new: true,
+    // Handle profile image upload
+    if (req.files?.profileImage?.[0]) {
+      const img = req.files.profileImage[0];
+      const filePath = `${Date.now()}-${path.parse(img.originalname).name}`;
+      const url = await cloud.uploadStreamImage(img.buffer, filePath);
+
+      // Delete old profile image if exists
+      if (user.profileImage) {
+        await cloud.deleteImage(user.profileImage);
       }
-    );
+
+      updateData.profileImage = url.secure_url;
+    }
+
+    
+
+    const updated = await User.findByIdAndUpdate(id, { $set: updateData }, {
+      new: true,           // return updated doc
+      runValidators: true, // ensure schema validation
+    });
+
     return SuccessHandler(updated, 200, res);
   } catch (error) {
     return ErrorHandler(error.message, 500, req, res);
   }
 };
+
+
 
 const getMe = async (req, res) => {
   // #swagger.tags = ['auth']
@@ -346,6 +358,7 @@ const socialAuth = async (req, res) => {
     return ErrorHandler(error.message, 500, req, res);
   }
 };
+
 
 module.exports = {
   register,

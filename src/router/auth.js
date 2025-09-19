@@ -11,7 +11,11 @@ router.route("/forgotPassword").post(auth.forgotPassword);
 router.route("/resetPassword").put(auth.resetPassword);
 // router.route("/updatePassword").put(isAuthenticated, auth.updatePassword);
 router.route("/me").get(isAuthenticated, auth.getMe);
-router.route("/profile").put(isAuthenticated, auth.updateProfile);
+router.route("/profile").put(isAuthenticated,
+      uploader.fields([
+        { name: "profileImage", maxCount: 1 },
+      ]),
+     auth.updateProfile);
 
 // router.route("/updateAdminProfile").put(
 //   isAuthenticated,

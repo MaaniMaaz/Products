@@ -1,22 +1,48 @@
-// import dotenv from "dotenv";
 const transporter = require("../provider/emailTransport.js");
 const dotenv = require("dotenv");
 
 dotenv.config({ path: "./src/config/config.env" });
 
-const sendOrderConfirmationMail = async (recipientEmail, orderId) => {
+const sendOrderMail = async (recipientEmail, orderId, status) => {
   try {
+    // Different subject + message based on status
+    let subject, message, color;
+    switch (status) {
+      case "confirmed":
+        subject = "Your Order is Confirmed ✅";
+        message = "Thank you for shopping with us! Your order has been successfully confirmed.";
+        color = "#036958";
+        break;
+
+      case "shipped":
+        subject = "Your Order is on the Way 🚚";
+        message = "Good news! Your order has been shipped and is on its way to you.";
+        color = "#007bff";
+        break;
+
+      case "cancelled":
+        subject = "Your Order has been Cancelled ❌";
+        message = "We’re sorry to inform you that your order has been cancelled. Please contact support if this is unexpected.";
+        color = "#dc3545";
+        break;
+
+      default:
+        subject = "Order Update";
+        message = "Your order status has been updated.";
+        color = "#333";
+    }
+
     const mailOptions = {
       from: `"Primewell" <${process.env.EMAIL}>`,
       to: recipientEmail,
-      subject: "Your Order is Confirmed ✅",
-      text: `Hi, your order #${orderId} has been confirmed.`,
+      subject,
+      text: `Hi, your order #${orderId} is now ${status}.`,
       html: `
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Order Confirmation</title>
+  <title>Order ${status}</title>
   <style>
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -40,12 +66,12 @@ const sendOrderConfirmationMail = async (recipientEmail, orderId) => {
     .logo {
       font-size: 28px;
       font-weight: bold;
-      color: #036958;
+      color: ${color};
       margin-bottom: 10px;
     }
     .order-box {
-      background: #e5faf4;
-      border: 2px dashed #036958;
+      background: #f9f9f9;
+      border: 2px dashed ${color};
       border-radius: 8px;
       padding: 30px;
       text-align: center;
@@ -54,7 +80,7 @@ const sendOrderConfirmationMail = async (recipientEmail, orderId) => {
     .order-id {
       font-size: 24px;
       font-weight: bold;
-      color: #036958;
+      color: ${color};
       margin: 10px 0;
     }
     .footer {
@@ -71,18 +97,17 @@ const sendOrderConfirmationMail = async (recipientEmail, orderId) => {
   <div class="container">
     <div class="header">
       <div class="logo">🏥 Primewell</div>
-      <h2>Order Confirmation</h2>
+      <h2>Order ${status.charAt(0).toUpperCase() + status.slice(1)}</h2>
     </div>
 
     <p>Hello,</p>
-    <p>Thank you for shopping with us! Your order has been successfully confirmed.</p>
+    <p>${message}</p>
 
     <div class="order-box">
       <div>Your Order ID is:</div>
       <div class="order-id">#${orderId}</div>
     </div>
 
-    <p>We’ll notify you when your order is shipped.</p>
     <p>If you have any questions, please contact our support team.</p>
 
     <div class="footer">
@@ -96,10 +121,10 @@ const sendOrderConfirmationMail = async (recipientEmail, orderId) => {
     };
 
     const info = await transporter.sendMail(mailOptions);
-    console.log("Order confirmation sent: ", info.messageId);
+    console.log(`Order ${status} email sent: `, info.messageId);
   } catch (error) {
-    console.error("Error sending order confirmation: ", error);
+    console.error("Error sending order email: ", error);
   }
 };
 
-module.exports = sendOrderConfirmationMail;
+module.exports = sendOrderMail;

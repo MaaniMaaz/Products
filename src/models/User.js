@@ -10,6 +10,18 @@ const userSchema = new Schema(
       type: String,
      required:true
     },
+    profileImage: {
+      type: String,
+    },
+    phone: {
+      type: String,
+    },
+    address: {
+      type: String,
+    },
+    bio: {
+      type: String,
+    },
     email: {
       type: String,
       unique:true,

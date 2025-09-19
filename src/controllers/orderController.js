@@ -1,7 +1,8 @@
 // order.controller.js
 const Order = require("../models/Order");
-const sendOrderConfirmationMail = require("../utils/SendOrderConfirmMail");
-
+const sendOrderMail = require("../utils/SendOrderConfirmMail");
+// const sendOrderConfirmationMail = require("../utils/SendOrderConfirmMail");
+const mongoose = require("mongoose");
 // Create Order
 const createOrder = async (req, res) => {
   // #swagger.tags = ['Order']
@@ -33,163 +34,90 @@ const createOrder = async (req, res) => {
 };
 
 
-// const getAllOrders = async (req, res) => {
-//   // #swagger.tags = ['Order']
-//   try {
-//     const {
-//       page = 1,
-//       limit = 10,
-//       warehouse,
-//       sortBy = 'createdAt',
-//       sortOrder = 'desc'
-//     } = req.query;
-
-//     // Convert to numbers
-//     const pageNum = parseInt(page);
-//     const limitNum = parseInt(limit);
-//     const skip = (pageNum - 1) * limitNum;
-
-//     // Build sort object
-//     const sortObj = {};
-//     sortObj[sortBy] = sortOrder === 'desc' ? -1 : 1;
-
-//     // Build aggregation pipeline
-//     const pipeline = [
-//       // Lookup user information first
-//       {
-//         $lookup: {
-//           from: "users",
-//           localField: "user",
-//           foreignField: "_id",
-//           as: "user",
-//           pipeline: [
-//             {
-//               $project: {
-//                 name: 1,
-//                 email: 1
-//               }
-//             }
-//           ]
-//         }
-//       },
-      
-//       // Convert user array to object
-//       {
-//         $addFields: {
-//           user: { $arrayElemAt: ["$user", 0] }
-//         }
-//       },
-      
-//       // Lookup and populate products
-//       {
-//         $lookup: {
-//           from: "products", // Replace with your actual products collection name
-//           localField: "products.product",
-//           foreignField: "_id",
-//           as: "products.product.details"
-//         }
-//       },
-      
-//       // Reconstruct products array with populated product data
-//       // {
-//       //   $addFields: {
-//       //     products: {
-//       //       $map: {
-//       //         input: "$products",
-//       //         as: "orderProduct",
-//       //         in: {
-//       //           product: {
-//       //             $arrayElemAt: [
-//       //               {
-//       //                 $filter: {
-//       //                   input: "$populatedProducts",
-//       //                   cond: { $eq: ["$$this._id", "$$orderProduct.product"] }
-//       //                 }
-//       //               },
-//       //               0
-//       //             ]
-//       //           },
-//       //           quantity: "$$orderProduct.quantity",
-//       //           price: "$$orderProduct.price",
-//       //           _id: "$$orderProduct._id"
-//       //         }
-//       //       }
-//       //     }
-//       //   }
-//       // },
-      
-//       // // Remove the temporary populatedProducts field
-//       // {
-//       //   $unset: "populatedProducts"
-//       // },
-      
-//       // // Filter by warehouse if provided (must be after product population)
-//       // ...(warehouse ? [
-//       //   {
-//       //     $match: {
-//       //       "products.product.warehouse": new mongoose.Types.ObjectId(warehouse);
-//       //     }
-//       //   }
-//       // ] : []),
-      
-//       // Sort orders
-//       { $sort: sortObj },
-      
-//       // Add pagination using facet
-//       {
-//         $facet: {
-//           orders: [
-//             { $skip: skip },
-//             { $limit: limitNum }
-//           ],
-//           totalCount: [
-//             { $count: "count" }
-//           ]
-//         }
-//       }
-//     ];
-
-//     const result = await Order.aggregate(pipeline);
-    
-//     const orders = result[0].orders || [];
-//     const totalCount = result[0].totalCount[0]?.count || 0;
-//     const totalPages = Math.ceil(totalCount / limitNum);
-
-//     return res.status(200).json({
-//       success: true,
-//       orders,
-//       pagination: {
-//         currentPage: pageNum,
-//         totalPages,
-//         totalCount,
-//         hasNext: pageNum < totalPages,
-//         hasPrev: pageNum > 1,
-//         limit: limitNum
-//       },
-//       filters: {
-//         warehouse: warehouse || null
-//       }
-//     });
-
-//   } catch (error) {
-//     console.error('Error in getAllOrders:', error);
-//     return res.status(500).json({ 
-//       success: false, 
-//       message: error.message || "Error fetching orders"
-//     });
-//   }
-// };
-
-
-// Get My Orders (User)
 const getAllOrders = async (req, res) => {
   // #swagger.tags = ['Order']
   try {
-    const userId = req.user._id; // assuming middleware sets req.user
+    const { warehouse, orderId ,user} = req.query;
 
-    const orders = await Order.find()
-      .populate("products.product") // populate product details
-      .sort({ createdAt: -1 });
+    // Base pipeline
+    const pipeline = [
+      // Unwind products array
+      { $unwind: "$products" },
+
+      // Lookup to join Product collection
+      {
+        $lookup: {
+          from: "products", // collection name in MongoDB
+          localField: "products.product",
+          foreignField: "_id",
+          as: "productDetails",
+        },
+      },
+
+      // Flatten productDetails (since lookup returns an array)
+      { $unwind: "$productDetails" },
+    ];
+
+    // Conditionally add user filter
+    if (user) {
+      pipeline.push({
+        $match: {
+          "user": new mongoose.Types.ObjectId(user),
+        },
+      });
+    }
+    // Conditionally add warehouse filter
+    if (warehouse) {
+      pipeline.push({
+        $match: {
+          "productDetails.warehouse": new mongoose.Types.ObjectId(warehouse),
+        },
+      });
+    }
+
+    // Conditionally add orderId search (partial text search on _id)
+    if (orderId) {
+      pipeline.push({
+        $match: {
+          $expr: {
+            $regexMatch: {
+              input: { $toString: "$_id" },
+              regex: orderId,
+              options: "i", // case-insensitive
+            },
+          },
+        },
+      });
+    }
+
+    // Continue pipeline
+    pipeline.push(
+      {
+        $group: {
+          _id: "$_id",
+          user: { $first: "$user" },
+          clientDetails: { $first: "$clientDetails" },
+          billingAddress: { $first: "$billingAddress" },
+          preference: { $first: "$preference" },
+          tax: { $first: "$tax" },
+          status: { $first: "$status" },
+          totalPrice: { $first: "$totalPrice" },
+          createdAt: { $first: "$createdAt" },
+          updatedAt: { $first: "$updatedAt" },
+          products: {
+            $push: {
+              qnt: "$products.qnt",
+              unitPrice: "$products.unitPrice",
+              product: "$productDetails",
+            },
+          },
+        },
+      },
+      // Sort by creation date (latest first)
+      { $sort: { createdAt: -1 } }
+    );
+
+    const orders = await Order.aggregate(pipeline);
 
     return res.status(200).json({ success: true, orders });
   } catch (error) {
@@ -197,15 +125,94 @@ const getAllOrders = async (req, res) => {
   }
 };
 
+
+
+
+// Get My Orders (User)
+// const getAllOrders = async (req, res) => {
+//   // #swagger.tags = ['Order']
+//   try {
+//     const userId = req.user._id; // assuming middleware sets req.user
+
+//     const orders = await Order.find()
+//       .populate("products.product") // populate product details
+//       .sort({ createdAt: -1 });
+
+//     return res.status(200).json({ success: true, orders });
+//   } catch (error) {
+//     return res.status(500).json({ success: false, message: error.message });
+//   }
+// };
+
 // Get My Orders (User)
 const getMyOrders = async (req, res) => {
   // #swagger.tags = ['Order']
   try {
-    const userId = req.user._id; // assuming middleware sets req.user
+    const { orderId, status } = req.query;
+    const userId = req.user._id; // from middleware
 
-    const orders = await Order.find({ user: userId })
-      .populate("products.product", "name brand price images") // populate product details
-      .sort({ createdAt: -1 });
+    const filter = { user: userId };
+
+    // Full-text search on orderId (_id as string)
+    if (orderId) {
+      filter._id = { $regex: orderId, $options: "i" }; // partial & case-insensitive
+    }
+
+    // Filter by status if provided
+    if (status) {
+      filter.status = status.toLowerCase();
+    }
+
+    const orders = await Order.aggregate([
+      {
+        $addFields: {
+          orderIdStr: { $toString: "$_id" }, // convert ObjectId to string
+        },
+      },
+      {
+        $match: {
+          user: new mongoose.Types.ObjectId(userId),
+          ...(status && { status: status.toLowerCase() }),
+          ...(orderId && { orderIdStr: { $regex: orderId, $options: "i" } }),
+        },
+      },
+      {
+        $lookup: {
+          from: "products",
+          localField: "products.product",
+          foreignField: "_id",
+          as: "productDetails",
+        },
+      },
+      {
+        $addFields: {
+          products: {
+            $map: {
+              input: "$products",
+              as: "p",
+              in: {
+                qnt: "$$p.qnt",
+                unitPrice: "$$p.unitPrice",
+                product: {
+                  $arrayElemAt: [
+                    {
+                      $filter: {
+                        input: "$productDetails",
+                        as: "pd",
+                        cond: { $eq: ["$$pd._id", "$$p.product"] },
+                      },
+                    },
+                    0,
+                  ],
+                },
+              },
+            },
+          },
+        },
+      },
+      { $project: { productDetails: 0, orderIdStr: 0 } }, // remove helper fields
+      { $sort: { createdAt: -1 } },
+    ]);
 
     return res.status(200).json({ success: true, orders });
   } catch (error) {
@@ -236,26 +243,25 @@ const updateOrderStatus = async (req, res) => {
       return res.status(404).json({ success: false, message: "Order not found" });
     }
 
-    console.log(status , order?.user?.email);
-    
-    // Send confirmation email only when status is confirmed
-    if (status === "confirmed" && order.user?.email) {
-      await sendOrderConfirmationMail(
+    // Send status email if user email exists
+    if (order.user?.email) {
+      await sendOrderMail(
         order.user.email,
-        order._id.toString().slice(0, 8),
-        order.user.name || "Customer"
+        order._id.toString().slice(0, 8), // short ID
+        status // dynamic status: confirmed, shipped, cancelled
       );
     }
 
     return res.status(200).json({
       success: true,
-      message: "Order status updated",
+      message: `Order status updated to ${status}`,
       order,
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
+
 
 
 module.exports = { createOrder,getAllOrders , getMyOrders,updateOrderStatus };
