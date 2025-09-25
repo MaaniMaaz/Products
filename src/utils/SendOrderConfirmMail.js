@@ -40,7 +40,7 @@ const sendOrderMail = async (recipientEmail, orderId, status) => {
     const orderLink = status === "pending"
   ? `
     <div style="text-align:center; margin: 20px 0;">
-      <a href="http://localhost:5173/dashboard/order"
+      <a href="https://products-fe-three.vercel.app/dashboard/order"
          style="background-color:${color}; color:#ffffff; padding:12px 24px; 
                 text-decoration:none; border-radius:6px; display:inline-block; 
                 font-weight:bold;">
