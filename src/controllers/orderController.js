@@ -41,6 +41,12 @@ const getAllOrders = async (req, res) => {
 
     // Base pipeline
     const pipeline = [
+      {
+  $match: {
+    status: { $ne: "unpaid" },
+    
+  },
+},
       // Unwind products array
       { $unwind: "$products" },
 
@@ -170,12 +176,13 @@ const getMyOrders = async (req, res) => {
         },
       },
       {
-        $match: {
-          user: new mongoose.Types.ObjectId(userId),
-          ...(status && { status: status.toLowerCase() }),
-          ...(orderId && { orderIdStr: { $regex: orderId, $options: "i" } }),
-        },
-      },
+  $match: {
+    user: new mongoose.Types.ObjectId(userId),
+    status: { $ne: "unpaid" },
+    ...(status && { status: status.toLowerCase() }),
+    ...(orderId && { orderIdStr: { $regex: orderId, $options: "i" } }),
+  },
+},
       {
         $lookup: {
           from: "products",
@@ -244,10 +251,11 @@ const updateOrderStatus = async (req, res) => {
     }
 
     // Send status email if user email exists
-    if (order.user?.email) {
+    if (order.user?.email && status !== "paid") {
       await sendOrderMail(
         order.user.email,
-        order._id.toString().slice(0, 8), // short ID
+        // order._id.toString().slice(0, 8), // short ID
+        order._id, // short ID
         status // dynamic status: confirmed, shipped, cancelled
       );
     }

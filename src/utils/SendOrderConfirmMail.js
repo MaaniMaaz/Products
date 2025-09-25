@@ -8,6 +8,11 @@ const sendOrderMail = async (recipientEmail, orderId, status) => {
     // Different subject + message based on status
     let subject, message, color;
     switch (status) {
+     case "pending":
+  subject = "Your Order is Pending ⏳";
+  message = "Thank you for choosing us! Your order has been reviewed and is now in a pending state. You can proceed with the payment to get it marked as paid.";
+  color = "#EAB308";
+  break;
       case "confirmed":
         subject = "Your Order is Confirmed ✅";
         message = "Thank you for shopping with us! Your order has been successfully confirmed.";
@@ -32,6 +37,18 @@ const sendOrderMail = async (recipientEmail, orderId, status) => {
         color = "#333";
     }
 
+    const orderLink = status === "pending"
+  ? `
+    <div style="text-align:center; margin: 20px 0;">
+      <a href="http://localhost:5173/dashboard/order"
+         style="background-color:${color}; color:#ffffff; padding:12px 24px; 
+                text-decoration:none; border-radius:6px; display:inline-block; 
+                font-weight:bold;">
+        View Orders
+      </a>
+    </div>
+  `
+  : "";
     const mailOptions = {
       from: `"Primewell" <${process.env.EMAIL}>`,
       to: recipientEmail,
@@ -102,6 +119,8 @@ const sendOrderMail = async (recipientEmail, orderId, status) => {
 
     <p>Hello,</p>
     <p>${message}</p>
+
+   ${orderLink}
 
     <div class="order-box">
       <div>Your Order ID is:</div>

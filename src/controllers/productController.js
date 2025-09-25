@@ -15,9 +15,9 @@ const createProductByCsv = async (req, res) => {
     const { warehouse } = req.body;
     
     // Validate warehouse ID
-    if (!warehouse) {
-      return ErrorHandler("Warehouse ID is required", 400, req, res);
-    }
+    // if (!warehouse) {
+    //   return ErrorHandler("Warehouse ID is required", 400, req, res);
+    // }
     
     // Debug: Log the request files structure
     console.log('req.files:', req.files);
@@ -130,6 +130,7 @@ const createProductByCsv = async (req, res) => {
     // Fetch product data from API
     const apiResponse = await axios.post(
       `https://app.apexapplications.io/api/data/get-asins-info`,
+      // { asins: ["B0BVDJJFXW"] },
       { asins: asins },
       { headers }
     );
@@ -140,30 +141,30 @@ const createProductByCsv = async (req, res) => {
     // Save products to database
     const savedProducts = [];
     
-    for (const productData of productsData) {
-      // Assuming you have a Product model/schema
-      // Adjust the fields based on your database schema and API response structure
-      const productToSave = {
-        warehouse: warehouse,
-        asin: productData.asin,
-        name: productData.title,
-        price: asinToExtras[productData.asin]?.unitCost || null,
-        images: productData.image,
-        brand: productData.brand,
-        amazonBb: productData.price,
-        amazonFees: productData.fees, // FIXED: Changed from productsData.fees to productData.fees
-        mqc: asinToExtras[productData.asin]?.mqc || null,
-        upc: asinToExtras[productData.asin]?.upc || null,
-        // Add other fields as needed
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
+    // for (const productData of productsData) {
+    //   // Assuming you have a Product model/schema
+    //   // Adjust the fields based on your database schema and API response structure
+    //   const productToSave = {
+    //     warehouse: warehouse,
+    //     asin: productData.asin,
+    //     name: productData.title,
+    //     price: asinToExtras[productData.asin]?.unitCost || null,
+    //     images: productData.image,
+    //     brand: productData.brand,
+    //     amazonBb: productData.price,
+    //     amazonFees: productData.fees, // FIXED: Changed from productsData.fees to productData.fees
+    //     mqc: asinToExtras[productData.asin]?.mqc || null,
+    //     upc: asinToExtras[productData.asin]?.upc || null,
+    //     // Add other fields as needed
+    //     createdAt: new Date(),
+    //     updatedAt: new Date()
+    //   };
 
-      // Save to database (example using a hypothetical Product model)
-      // Replace this with your actual database saving logic
-      const savedProduct = await Product.create(productToSave);
-      savedProducts.push(savedProduct);
-    }
+    //   // Save to database (example using a hypothetical Product model)
+    //   // Replace this with your actual database saving logic
+    //   const savedProduct = await Product.create(productToSave);
+    //   savedProducts.push(savedProduct);
+    // }
 
     // Return success response
     return res.status(200).json({

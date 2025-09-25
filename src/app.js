@@ -8,10 +8,12 @@ const loggerMiddleware = require("./middleware/loggerMiddleware");
 const swaggerUi = require("swagger-ui-express");
 const swaggerFile = require("../swagger_output.json"); // Generated Swagger file
 const path = require("path");
+const Order = require("./models/Order");
 const dotenv = require("dotenv");
 dotenv.config({ path: "./config/config.env" });
 const moment = require('moment')
-
+const Stripe = require("stripe");
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 console.log(moment().endOf("day").toDate())
 
@@ -22,6 +24,56 @@ app.use(cors());
 app.options("*", cors());
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 app.use(loggerMiddleware);
+
+// webhooks
+const endpointSecret = process.env.WEBHOOK_SECRET;
+
+app.post(
+  "/webhook",
+  bodyParser.raw({ type: "*/*" }),
+  async (request, response) => {
+    const sig = request.headers["stripe-signature"];
+
+    let event;
+
+    try {
+      event = stripe.webhooks.constructEvent(request.body, sig, endpointSecret);
+    } catch (err) {
+      response.status(400).send(`Webhook Error: ${err.message}`);
+      return;
+    }
+
+    // Handle the event
+    switch (event.type) {
+      case "checkout.session.completed":
+        const paymentIntentSucceeded = event.data.object;
+        console.log("paymentItnennnnnn", paymentIntentSucceeded);
+
+        const session = event.data.object;
+    const orderId = session.metadata?.orderId;
+
+    if (orderId) {
+      await Order.findByIdAndUpdate(orderId, {
+        status: "paid",
+        stripeSessionId: session.id,
+        paymentReceivedAt: new Date(),
+        // optional: store raw session for audit
+        // stripeSession: session,
+      });
+      console.log("Order marked paid:", orderId);
+    } else {
+      console.warn("No orderId in metadata for session:", session.id);
+    }
+        break;
+
+      default:
+        console.log(`Unhandled event type ${event.type}`);
+    }
+
+    // Return a 200 response to acknowledge receipt of the event
+    response.send({ received: true });
+  }
+);
 
 
 app.use(express.urlencoded({ extended: true }));

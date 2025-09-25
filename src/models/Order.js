@@ -41,11 +41,18 @@ const orderSchema = new Schema(
     },
     status: {
       type: String,
-      default: "pending",
+      enum:["review","pending","paid","unpaid","confirmed","cancel"],
+      default: "review",
     },
     totalPrice: {
       type: String,
       required: true,
+    },
+    stripeSessionId: {
+      type: String,
+    },
+    paymentReceivedAt: {
+      type: Date,
     },
   },
   { timestamps: true }
