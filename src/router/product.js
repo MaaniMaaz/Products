@@ -5,6 +5,7 @@ const { isAuthenticated } = require("../middleware/auth");
 const uploader = require("../utils/uploader");
 
 router.route("/").get(isAuthenticated, product.getAllProducts);
+router.route("/update-product").get(isAuthenticated, product.updateProductsFromAPI);
 router.route("/:id").get(isAuthenticated, product.getProductById);
 router.route("/csv").post(isAuthenticated, uploader.fields([
     { name: "file", maxCount: 1 },

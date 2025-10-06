@@ -13,6 +13,7 @@ const dotenv = require("dotenv");
 dotenv.config({ path: "./config/config.env" });
 const moment = require('moment')
 const Stripe = require("stripe");
+const { CronJob } = require("cron");
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 console.log(moment().endOf("day").toDate())
@@ -126,5 +127,26 @@ app.use((req, res, next) => {
   next(new ApiError(404, "Not found"));
 });
 
+
+const updateProducts = new CronJob(
+  "0 0 0 * * *",
+  async () => {
+   try {
+    console.log("⏰ Running daily product update job...");
+
+    // Call your update API (assuming backend runs locally on port 5000)
+    await axios.get("https://products-s9xv.onrender.com/product/update-product");
+
+    console.log("✅ Product update completed");
+  } catch (error) {
+    console.error("❌ Error running daily product update:", error.message);
+  }
+  },
+  null,
+  true,
+  // "America/Los_Angeles"
+);
+
+updateProducts.start();
 
 module.exports = app;

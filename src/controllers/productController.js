@@ -1,3 +1,5 @@
+const { applyRoiCap, toNum } = require("../functions/helper");
+
 const SuccessHandler = require("../utils/SuccessHandler");
 const ErrorHandler = require("../utils/ErrorHandler");
 const Product = require("../models/Products");
@@ -9,6 +11,12 @@ const path = require('path');
 const Papa = require('papaparse'); // Better alternative for CSV parsing
 const { Readable } = require('stream');
 const mongoose = require("mongoose");
+const History = require("../models/History");
+
+  // API credentials
+    const apiKeyId = "8c7b051f-b0ad-4e70-9280-652f4b09c721";
+    const apiKeySecret = "eba2d5e86af48563553159bdb996a55439719c243b3325cab30c9aee467866ccb976b0807a98d44421389fddae7ca5aeff136c0a4154a290c3370e3cf9fe2d4c";
+
 
 const createProductByCsv = async (req, res) => {
   try {
@@ -39,10 +47,7 @@ const createProductByCsv = async (req, res) => {
       return ErrorHandler("Please upload a CSV file", 400, req, res);
     }
 
-    // API credentials
-    const apiKeyId = "8c7b051f-b0ad-4e70-9280-652f4b09c721";
-    const apiKeySecret = "eba2d5e86af48563553159bdb996a55439719c243b3325cab30c9aee467866ccb976b0807a98d44421389fddae7ca5aeff136c0a4154a290c3370e3cf9fe2d4c";
-
+  
     // Create signature for API authentication
     const signPayload = `${Date.now()}${Math.random()}`;
     const signature = createHmac("sha256", apiKeySecret).update(signPayload).digest("hex");
@@ -141,30 +146,30 @@ const createProductByCsv = async (req, res) => {
     // Save products to database
     const savedProducts = [];
     
-    // for (const productData of productsData) {
-    //   // Assuming you have a Product model/schema
-    //   // Adjust the fields based on your database schema and API response structure
-    //   const productToSave = {
-    //     warehouse: warehouse,
-    //     asin: productData.asin,
-    //     name: productData.title,
-    //     price: asinToExtras[productData.asin]?.unitCost || null,
-    //     images: productData.image,
-    //     brand: productData.brand,
-    //     amazonBb: productData.price,
-    //     amazonFees: productData.fees, // FIXED: Changed from productsData.fees to productData.fees
-    //     mqc: asinToExtras[productData.asin]?.mqc || null,
-    //     upc: asinToExtras[productData.asin]?.upc || null,
-    //     // Add other fields as needed
-    //     createdAt: new Date(),
-    //     updatedAt: new Date()
-    //   };
+    for (const productData of productsData) {
+      // Assuming you have a Product model/schema
+      // Adjust the fields based on your database schema and API response structure
+      const productToSave = {
+        warehouse: warehouse,
+        asin: productData.asin,
+        name: productData.title,
+        price: asinToExtras[productData.asin]?.unitCost || null,
+        images: productData.image,
+        brand: productData.brand,
+        amazonBb: productData.price,
+        amazonFees: productData.fees, // FIXED: Changed from productsData.fees to productData.fees
+        mqc: asinToExtras[productData.asin]?.mqc || null,
+        upc: asinToExtras[productData.asin]?.upc || null,
+        // Add other fields as needed
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
 
-    //   // Save to database (example using a hypothetical Product model)
-    //   // Replace this with your actual database saving logic
-    //   const savedProduct = await Product.create(productToSave);
-    //   savedProducts.push(savedProduct);
-    // }
+      // Save to database (example using a hypothetical Product model)
+      // Replace this with your actual database saving logic
+      const savedProduct = await Product.create(productToSave);
+      savedProducts.push(savedProduct);
+    }
 
     // Return success response
     return res.status(200).json({
@@ -180,6 +185,102 @@ const createProductByCsv = async (req, res) => {
   } catch (error) {
     console.error('Error processing CSV:', error);
     return ErrorHandler(error.message || "Error processing CSV file", 500, req, res);
+  }
+};
+
+
+const updateProductsFromAPI = async (req, res) => {
+  try {
+    const products = await Product.find({});
+    if (!products.length) {
+      return res.status(404).json({ success: false, message: "No products found in DB" });
+    }
+
+    const asins = products.map(p => p.asin).filter(Boolean);
+
+    const signPayload = `${Date.now()}${Math.random()}`;
+    const signature = createHmac("sha256", apiKeySecret)
+      .update(signPayload)
+      .digest("hex");
+
+   const headers = {
+      "x-api-key-id": apiKeyId,
+      "x-api-sign-input": signPayload,
+      "x-api-signature": signature,
+    };
+
+    const chunkSize = 50;
+    let updatedProducts = [];
+
+    for (let i = 0; i < asins?.length; i += chunkSize) {
+      console.log("updating");
+      
+      const chunk = asins.slice(i, i + chunkSize);
+
+      const apiResponse = await axios.post(
+        "https://app.apexapplications.io/api/data/get-asins-info",
+        { asins: chunk },
+        { headers }
+      );
+
+      const productsData = apiResponse.data || [];
+
+      console.log(apiResponse,"apiResponse");
+      for (const productData of productsData) {
+        const singleProductDetail = await Product.findOne({ asin: productData?.asin })
+        const basePrice0 = toNum(singleProductDetail?.price?.split("$")[1]);
+        const amazonBb = toNum(productData?.price); // or correct field if different
+        const amazonFees = toNum(productData?.fees);
+
+        // apply calculations
+        const { basePrice, profit, margin, roi } = applyRoiCap(basePrice0, amazonBb, amazonFees);
+
+        const updated = await Product.findOneAndUpdate(
+          { asin: productData?.asin },
+          {
+            $set: {
+              name: productData.title,
+              images: productData.image,
+              brand: productData.brand,
+              amazonBb,
+              amazonFees,
+              basePrice,
+              profit,
+              margin,
+              roi,
+              updatedAt: new Date(),
+            },
+          },
+          { new: true }
+        );
+
+        const history = await History.create({
+          product:singleProductDetail?._id,
+          asin:singleProductDetail?.asin,
+          prevRoi:singleProductDetail?.roi,
+          prevAmazonFees:singleProductDetail?.amazonFees,
+          prevAmazonBb:singleProductDetail?.amazonBb,
+          prevMargin:singleProductDetail?.margin,
+          prevProfit:singleProductDetail?.profit,
+          latestRoi:roi,
+          latestAmazonFees:amazonFees,
+          latestAmazonBb:amazonBb,
+          latestMargin:margin,
+          latestProfit:profit
+        })
+
+        if (updated) updatedProducts.push(updated);
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `Updated ${updatedProducts.length} products successfully`,
+      data: updatedProducts,
+    });
+  } catch (error) {
+    console.error("Error updating products:", error);
+    return res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -355,5 +456,6 @@ module.exports = {
   deleteProduct,
   getAllProducts,
   getProductById,
-  createProductByCsv
+  createProductByCsv,
+  updateProductsFromAPI
 };

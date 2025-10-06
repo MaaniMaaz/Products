@@ -391,3 +391,7 @@
 {"date":"2025-09-23T12:14:29.002Z","level":"error","message":"Warehouse ID is required","method":"POST","service":"user-service","url":"/csv"}
 {"date":"2025-09-25T08:27:15.971Z","level":"error","message":"Invalid integer: NaN","method":"POST","service":"user-service","url":"/checkout"}
 {"date":"2025-09-25T08:28:42.820Z","level":"error","message":"Invalid integer: NaN","method":"POST","service":"user-service","url":"/checkout"}
+{"date":"2025-10-02T11:19:26.317Z","level":"error","message":"Invalid credentials","method":"POST","service":"user-service","url":"/login"}
+{"date":"2025-10-03T13:21:15.631Z","level":"error","message":"Invalid credentials","method":"POST","service":"user-service","url":"/login"}
+{"date":"2025-10-06T09:33:04.419Z","level":"error","message":"Cast to ObjectId failed for value \"update-product\" (type string) at path \"_id\" for model \"Product\"","method":"GET","service":"user-service","url":"/update-product"}
+{"date":"2025-10-06T09:33:04.524Z","level":"error","message":"Cast to ObjectId failed for value \"update-product\" (type string) at path \"_id\" for model \"Product\"","method":"GET","service":"user-service","url":"/update-product"}

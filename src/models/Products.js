@@ -25,6 +25,7 @@ const productsSchema = new Schema(
     },
     asin:{
        type:String,
+       unique:true,
        default:"-"
     },
     amazonBb:{
