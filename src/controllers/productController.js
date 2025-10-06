@@ -147,19 +147,28 @@ const createProductByCsv = async (req, res) => {
     const savedProducts = [];
     
     for (const productData of productsData) {
+       const basePrice0 = toNum(asinToExtras[productData.asin]?.unitCost?.split("$")[1]);
+        const amazonBb = toNum(productData?.price); // or correct field if different
+        const amazonFees = toNum(productData?.fees);
+
+        // apply calculations
+        const { basePrice, profit, margin, roi } = applyRoiCap(basePrice0, amazonBb, amazonFees);
       // Assuming you have a Product model/schema
       // Adjust the fields based on your database schema and API response structure
       const productToSave = {
         warehouse: warehouse,
         asin: productData.asin,
         name: productData.title,
-        price: asinToExtras[productData.asin]?.unitCost || null,
+        price: basePrice,
         images: productData.image,
         brand: productData.brand,
-        amazonBb: productData.price,
-        amazonFees: productData.fees, // FIXED: Changed from productsData.fees to productData.fees
+        amazonBb: amazonBb,
+        amazonFees: amazonFees, // FIXED: Changed from productsData.fees to productData.fees
         mqc: asinToExtras[productData.asin]?.mqc || null,
         upc: asinToExtras[productData.asin]?.upc || null,
+        profit:profit,
+        margin:margin,
+        roi:roi,
         // Add other fields as needed
         createdAt: new Date(),
         updatedAt: new Date()
