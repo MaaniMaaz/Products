@@ -15,16 +15,20 @@ const calcMetrics = (basePrice, amazonBb, amazonFees) => {
 
 const applyRoiCap = (basePrice0, amazonBb, amazonFees) => {
   let { basePrice, profit, margin, roi } = calcMetrics(basePrice0, amazonBb, amazonFees);
+  let isCapped = false;
+
   if (basePrice > 0 && roi > 40) {
     const S = amazonBb - amazonFees; // Net revenue
     basePrice = S / 1.4;
     ({ profit, margin, roi } = calcMetrics(basePrice, amazonBb, amazonFees));
+    isCapped = true;
   }
-  return { basePrice, profit, margin, roi };
+
+  return { basePrice, profit, margin, roi, isCapped };
 };
 
-module.exports={
-    toNum,
-    calcMetrics,
-    applyRoiCap
-}
+module.exports = {
+  toNum,
+  calcMetrics,
+  applyRoiCap
+};

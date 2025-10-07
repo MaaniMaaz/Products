@@ -6,13 +6,11 @@ const historySchema = new Schema(
     product: {
       type: Schema.Types.ObjectId,
       ref: "Product",
-      unique:true
     },
 
     asin: {
       type:String,
       required:true,
-      unique:true
     },
     prevRoi: {
       type:String,

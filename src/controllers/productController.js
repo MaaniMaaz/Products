@@ -135,7 +135,7 @@ const createProductByCsv = async (req, res) => {
     // Fetch product data from API
     const apiResponse = await axios.post(
       `https://app.apexapplications.io/api/data/get-asins-info`,
-      // { asins: ["B0BVDJJFXW"] },
+      // { asins: ["B0CCBXRYRC"] },
       { asins: asins },
       { headers }
     );
@@ -237,12 +237,12 @@ const updateProductsFromAPI = async (req, res) => {
       console.log(apiResponse,"apiResponse");
       for (const productData of productsData) {
         const singleProductDetail = await Product.findOne({ asin: productData?.asin })
-        const basePrice0 = toNum(singleProductDetail?.price?.split("$")[1]);
+        const basePrice0 = toNum(singleProductDetail?.price);
         const amazonBb = toNum(productData?.price); // or correct field if different
         const amazonFees = toNum(productData?.fees);
 
         // apply calculations
-        const { basePrice, profit, margin, roi } = applyRoiCap(basePrice0, amazonBb, amazonFees);
+        const { basePrice, profit, margin, roi,isCapped } = applyRoiCap(basePrice0, amazonBb, amazonFees);
 
         const updated = await Product.findOneAndUpdate(
           { asin: productData?.asin },
@@ -262,9 +262,10 @@ const updateProductsFromAPI = async (req, res) => {
           },
           { new: true }
         );
+if (isCapped){
 
-        const history = await History.create({
-          product:singleProductDetail?._id,
+  const history = await History.create({
+    product:singleProductDetail?._id,
           asin:singleProductDetail?.asin,
           prevRoi:singleProductDetail?.roi,
           prevAmazonFees:singleProductDetail?.amazonFees,
@@ -277,7 +278,8 @@ const updateProductsFromAPI = async (req, res) => {
           latestMargin:margin,
           latestProfit:profit
         })
-
+        
+      }
         if (updated) updatedProducts.push(updated);
       }
     }

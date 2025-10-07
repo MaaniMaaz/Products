@@ -395,3 +395,6 @@
 {"date":"2025-10-03T13:21:15.631Z","level":"error","message":"Invalid credentials","method":"POST","service":"user-service","url":"/login"}
 {"date":"2025-10-06T09:33:04.419Z","level":"error","message":"Cast to ObjectId failed for value \"update-product\" (type string) at path \"_id\" for model \"Product\"","method":"GET","service":"user-service","url":"/update-product"}
 {"date":"2025-10-06T09:33:04.524Z","level":"error","message":"Cast to ObjectId failed for value \"update-product\" (type string) at path \"_id\" for model \"Product\"","method":"GET","service":"user-service","url":"/update-product"}
+{"date":"2025-10-06T16:42:39.069Z","level":"error","message":"User email is not verified","method":"POST","service":"user-service","url":"/login"}
+{"date":"2025-10-06T16:44:30.617Z","level":"error","message":"User email is not verified","method":"POST","service":"user-service","url":"/login"}
+{"date":"2025-10-07T14:42:51.237Z","level":"error","message":"E11000 duplicate key error collection: products.products index: asin_1 dup key: { asin: \"B0CCBXRYRC\" }","method":"POST","service":"user-service","url":"/csv"}
