@@ -7,24 +7,26 @@ dotenv.config({ path: "./src/config/config.env" });
 
 const transporter = nodemailer.createTransport({
     // service: 'gmail',
-  host: "mail.privateemail.com",
-//   host: "1.2.3.4",
-  port: 465,
-  secure: true, // use false for STARTTLS; true for SSL on port 465
-  auth: {
-    user: process.env.EMAIL,
-    pass: process.env.APP_PASSWORD,
-  },
-});
-// const transporter = nodemailer.createTransport({
-//   service: 'google', // or your email service
-//   host: 'mail.privateemail.com', // correct SMTP server
-//   port: 587, // or 465 for SSL
-//   secure: false, // true for 465, false for other ports
+//   host: "mail.privateemail.com",
+// //   host: "1.2.3.4",
+//   port: 465,
+//   secure: true, // use false for STARTTLS; true for SSL on port 465
 //   auth: {
 //     user: process.env.EMAIL,
-//     pass: process.env.EMAIL_PASSWORD // App password for Gmail
-//   }
+//     pass: process.env.APP_PASSWORD,
+//   },
+
+
+  host: "mail.privateemail.com",      // e.g. "mail.strato.de" or "smtp.yourdomain.com"
+    port: 465,      // usually 465 (SSL) or 587 (TLS)
+    secure: true, // true for port 465
+    auth: {
+      user: process.env.EMAIL,
+      pass:process.env.APP_PASSWORD,
+    },
+  
+});
+
 // });
 
 transporter.verify((error, success) => {

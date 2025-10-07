@@ -50,8 +50,8 @@ const sendOrderMail = async (recipientEmail, orderId, status) => {
   `
   : "";
     const mailOptions = {
-      from: `"Primewell" <${process.env.EMAIL}>`,
-      to: recipientEmail,
+  from: `"Primewell" <${process.env.EMAIL}>`,
+     to: recipientEmail,
       subject,
       text: `Hi, your order #${orderId} is now ${status}.`,
       html: `

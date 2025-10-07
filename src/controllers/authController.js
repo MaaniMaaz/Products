@@ -60,6 +60,9 @@ const login = async (req, res) => {
     if (!user) {
       return ErrorHandler("User does not exist", 400, req, res);
     }
+    if (!user?.isEmailVerified) {
+      return ErrorHandler("User email is not verified", 400, req, res);
+    }
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
       return ErrorHandler("Invalid credentials", 400, req, res);
