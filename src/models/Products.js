@@ -53,6 +53,10 @@ const productsSchema = new Schema(
       type:String,
        default:"-"
     },
+    originalPrice: {
+      type:String,
+       default:"-"
+    },
     
   },
   { timestamps: true }

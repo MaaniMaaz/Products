@@ -12,6 +12,11 @@ const historySchema = new Schema(
       type:String,
       required:true,
     },
+    prevPrice: {
+      type:String,
+      required:true,
+      default:"0"
+    },
     prevRoi: {
       type:String,
       required:true,
@@ -36,6 +41,10 @@ const historySchema = new Schema(
       type:String,
       required:true,
        default:"0"
+    },
+    latestPrice: {
+      type:String,
+      required:true
     },
     latestRoi: {
       type:String,

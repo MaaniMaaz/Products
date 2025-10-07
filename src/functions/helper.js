@@ -1,4 +1,3 @@
-// === Helper functions ===
 const toNum = (v) => {
   if (v == null) return 0;
   if (typeof v === "number") return isFinite(v) ? v : 0;
@@ -13,22 +12,42 @@ const calcMetrics = (basePrice, amazonBb, amazonFees) => {
   return { basePrice, profit, margin, roi };
 };
 
-const applyRoiCap = (basePrice0, amazonBb, amazonFees) => {
-  let { basePrice, profit, margin, roi } = calcMetrics(basePrice0, amazonBb, amazonFees);
+const applyRoiCapWithHistory = (basePrice0, amazonBb, amazonFees) => {
+  // First round calculation (before capping)
+  const firstRound = calcMetrics(basePrice0, amazonBb, amazonFees);
+  
   let isCapped = false;
+  let secondRound = { ...firstRound };
 
-  if (basePrice > 0 && roi > 40) {
+  // Second round calculation (after capping if needed)
+  if (basePrice0 > 0 && firstRound.roi > 40) {
     const S = amazonBb - amazonFees; // Net revenue
-    basePrice = S / 1.4;
-    ({ profit, margin, roi } = calcMetrics(basePrice, amazonBb, amazonFees));
+    const cappedBasePrice = S / 1.4;
+    secondRound = calcMetrics(cappedBasePrice, amazonBb, amazonFees);
     isCapped = true;
   }
 
-  return { basePrice, profit, margin, roi, isCapped };
+  return {
+    // First round (pre-cap)
+    firstRound: {
+      basePrice: firstRound.basePrice,
+      profit: firstRound.profit,
+      margin: firstRound.margin,
+      roi: firstRound.roi
+    },
+    // Second round (post-cap)
+    secondRound: {
+      basePrice: secondRound.basePrice,
+      profit: secondRound.profit,
+      margin: secondRound.margin,
+      roi: secondRound.roi
+    },
+    isCapped
+  };
 };
 
 module.exports = {
   toNum,
   calcMetrics,
-  applyRoiCap
+  applyRoiCapWithHistory
 };

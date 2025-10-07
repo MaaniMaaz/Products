@@ -1,4 +1,4 @@
-const { applyRoiCap, toNum } = require("../functions/helper");
+const {  toNum, applyRoiCapWithHistory } = require("../functions/helper");
 
 const SuccessHandler = require("../utils/SuccessHandler");
 const ErrorHandler = require("../utils/ErrorHandler");
@@ -22,11 +22,6 @@ const createProductByCsv = async (req, res) => {
   try {
     const { warehouse } = req.body;
     
-    // Validate warehouse ID
-    // if (!warehouse) {
-    //   return ErrorHandler("Warehouse ID is required", 400, req, res);
-    // }
-    
     // Debug: Log the request files structure
     console.log('req.files:', req.files);
     
@@ -47,7 +42,6 @@ const createProductByCsv = async (req, res) => {
       return ErrorHandler("Please upload a CSV file", 400, req, res);
     }
 
-  
     // Create signature for API authentication
     const signPayload = `${Date.now()}${Math.random()}`;
     const signature = createHmac("sha256", apiKeySecret).update(signPayload).digest("hex");
@@ -74,10 +68,8 @@ const createProductByCsv = async (req, res) => {
     // Function to convert scientific notation to string
     const formatUPC = (value) => {
       if (!value) return null;
-      // Convert to string first, then check if it's in scientific notation
       const strValue = String(value).trim();
       if (strValue.includes('E') || strValue.includes('e')) {
-        // Parse as number and convert back to string without scientific notation
         const num = parseFloat(strValue);
         return Math.round(num).toString();
       }
@@ -86,10 +78,10 @@ const createProductByCsv = async (req, res) => {
 
     // Parse CSV using Papa Parse
     const parseResult = Papa.parse(csvData, {
-      header: true, // First row as headers
+      header: true,
       skipEmptyLines: true,
-      dynamicTyping: false, // Keep as strings to prevent scientific notation
-      transform: (value) => value.trim() // Trim whitespace
+      dynamicTyping: false,
+      transform: (value) => value.trim()
     });
 
     if (parseResult.errors.length > 0) {
@@ -97,22 +89,20 @@ const createProductByCsv = async (req, res) => {
       return ErrorHandler("Error parsing CSV file", 400, req, res);
     }
 
-    // Extract ASINs and map CSV extras (mqc, upc) by ASIN
+    // Extract ASINs and map CSV extras (mqc, upc, unitCost) by ASIN
     const asins = [];
     const asinToExtras = {};
     parseResult.data.forEach((row) => {
       console.log(row);
       
-      // Check multiple possible column names for ASIN
       const asinRaw = row["AMZ URL"] || row.ASIN || row.Asin || row.amazon_asin || row.product_asin;
       const asin = asinRaw && typeof asinRaw === 'string' ? asinRaw.trim() : asinRaw;
 
-      // Extract mqc/moc and upc from CSV using flexible header names
       const mqcRaw = row.MQC || row.mqc || row.MOC || row.moc || row.MOQ || row.moq;
       const upcRaw = row.UPC || row.upc || row.Upc;
-      const unitCost = row["Unit Cost"] 
+      const unitCost = row["Unit Cost"];
       const mqc = typeof mqcRaw === 'string' ? mqcRaw.trim() : mqcRaw;
-      const upc = formatUPC(upcRaw); // Use the formatting function
+      const upc = formatUPC(upcRaw);
       const unitCostPrice = typeof unitCost === 'string' ? unitCost.trim() : unitCost;
 
       if (asin && String(asin).trim()) {
@@ -121,7 +111,7 @@ const createProductByCsv = async (req, res) => {
         asinToExtras[asinKey] = {
           mqc: mqc ?? null,
           upc: upc ?? null,
-          unitCost : unitCostPrice ?? null
+          unitCost: unitCostPrice ?? null
         };
       }
     });
@@ -130,57 +120,56 @@ const createProductByCsv = async (req, res) => {
       return ErrorHandler("No valid ASINs found in CSV file", 400, req, res);
     }
 
-    console.log(`Found ${asins.length} ASINs in CSV:`, asins.slice(0, 5)); // Log first 5 ASINs
+    console.log(`Found ${asins.length} ASINs in CSV:`, asins.slice(0, 5));
 
     // Fetch product data from API
     const apiResponse = await axios.post(
       `https://app.apexapplications.io/api/data/get-asins-info`,
-      // { asins: ["B0CCBXRYRC"] },
       { asins: asins },
       { headers }
     );
 
     const productsData = apiResponse.data;
-    console.log(productsData ,"productdata");
+    console.log(productsData, "productdata");
 
     // Save products to database
     const savedProducts = [];
     
     for (const productData of productsData) {
-       const basePrice0 = toNum(asinToExtras[productData.asin]?.unitCost?.split("$")[1]);
-        const amazonBb = toNum(productData?.price); // or correct field if different
-        const amazonFees = toNum(productData?.fees);
+      const originalPrice = toNum(asinToExtras[productData.asin]?.unitCost?.split("$")[1]);
+      const amazonBb = toNum(productData?.price);
+      const amazonFees = toNum(productData?.fees);
 
-        // apply calculations
-        const { basePrice, profit, margin, roi } = applyRoiCap(basePrice0, amazonBb, amazonFees);
-      // Assuming you have a Product model/schema
-      // Adjust the fields based on your database schema and API response structure
+      // Apply ROI cap calculation with history
+      const { firstRound, secondRound, isCapped } = applyRoiCapWithHistory(
+        originalPrice,
+        amazonBb,
+        amazonFees
+      );
+
       const productToSave = {
         warehouse: warehouse,
         asin: productData.asin,
         name: productData.title,
-        price: basePrice,
+        originalPrice: originalPrice, // Store the original price from CSV
+        price: secondRound.basePrice, // Store the capped price (if capped)
         images: productData.image,
         brand: productData.brand,
         amazonBb: amazonBb,
-        amazonFees: amazonFees, // FIXED: Changed from productsData.fees to productData.fees
+        amazonFees: amazonFees,
         mqc: asinToExtras[productData.asin]?.mqc || null,
         upc: asinToExtras[productData.asin]?.upc || null,
-        profit:profit,
-        margin:margin,
-        roi:roi,
-        // Add other fields as needed
+        profit: secondRound.profit, // Final profit after capping
+        margin: secondRound.margin, // Final margin after capping
+        roi: secondRound.roi, // Final ROI after capping
         createdAt: new Date(),
         updatedAt: new Date()
       };
 
-      // Save to database (example using a hypothetical Product model)
-      // Replace this with your actual database saving logic
       const savedProduct = await Product.create(productToSave);
       savedProducts.push(savedProduct);
     }
 
-    // Return success response
     return res.status(200).json({
       success: true,
       message: `Successfully processed ${savedProducts.length} products from CSV`,
@@ -197,7 +186,6 @@ const createProductByCsv = async (req, res) => {
   }
 };
 
-
 const updateProductsFromAPI = async (req, res) => {
   try {
     const products = await Product.find({});
@@ -212,7 +200,7 @@ const updateProductsFromAPI = async (req, res) => {
       .update(signPayload)
       .digest("hex");
 
-   const headers = {
+    const headers = {
       "x-api-key-id": apiKeyId,
       "x-api-sign-input": signPayload,
       "x-api-signature": signature,
@@ -234,16 +222,24 @@ const updateProductsFromAPI = async (req, res) => {
 
       const productsData = apiResponse.data || [];
 
-      console.log(apiResponse,"apiResponse");
+      console.log(apiResponse, "apiResponse");
+      
       for (const productData of productsData) {
-        const singleProductDetail = await Product.findOne({ asin: productData?.asin })
-        const basePrice0 = toNum(singleProductDetail?.price);
-        const amazonBb = toNum(productData?.price); // or correct field if different
+        const singleProductDetail = await Product.findOne({ asin: productData?.asin });
+        
+        // Use originalPrice instead of price for calculations
+        const originalPrice = toNum(singleProductDetail?.originalPrice);
+        const amazonBb = toNum(productData?.price);
         const amazonFees = toNum(productData?.fees);
 
-        // apply calculations
-        const { basePrice, profit, margin, roi,isCapped } = applyRoiCap(basePrice0, amazonBb, amazonFees);
+        // Apply ROI cap calculation with history
+        const { firstRound, secondRound, isCapped } = applyRoiCapWithHistory(
+          originalPrice,
+          amazonBb,
+          amazonFees
+        );
 
+        // Update the product with final values
         const updated = await Product.findOneAndUpdate(
           { asin: productData?.asin },
           {
@@ -251,35 +247,40 @@ const updateProductsFromAPI = async (req, res) => {
               name: productData.title,
               images: productData.image,
               brand: productData.brand,
-              amazonBb,
-              amazonFees,
-              basePrice,
-              profit,
-              margin,
-              roi,
+              amazonBb: amazonBb,
+              amazonFees: amazonFees,
+              price: secondRound.basePrice, // Final capped price
+              profit: secondRound.profit, // Final profit after capping
+              margin: secondRound.margin, // Final margin after capping
+              roi: secondRound.roi, // Final ROI after capping
               updatedAt: new Date(),
             },
           },
           { new: true }
         );
-if (isCapped){
 
-  const history = await History.create({
-    product:singleProductDetail?._id,
-          asin:singleProductDetail?.asin,
-          prevRoi:singleProductDetail?.roi,
-          prevAmazonFees:singleProductDetail?.amazonFees,
-          prevAmazonBb:singleProductDetail?.amazonBb,
-          prevMargin:singleProductDetail?.margin,
-          prevProfit:singleProductDetail?.profit,
-          latestRoi:roi,
-          latestAmazonFees:amazonFees,
-          latestAmazonBb:amazonBb,
-          latestMargin:margin,
-          latestProfit:profit
-        })
+        // If ROI was capped, create history entry
+        if (isCapped) {
+          const history = await History.create({
+            product: singleProductDetail?._id,
+            asin: singleProductDetail?.asin,
+            // Previous values (first round - before capping)
+            prevPrice: singleProductDetail.originalPrice,
+            prevRoi: firstRound.roi,
+            prevAmazonFees: singleProductDetail?.amazonFees,
+            prevAmazonBb: singleProductDetail?.amazonBb,
+            prevMargin: firstRound.margin,
+            prevProfit: firstRound.profit,
+            // Latest values (second round - after capping)
+            latestPrice: secondRound.basePrice,
+            latestRoi: secondRound.roi,
+            latestAmazonFees: amazonFees,
+            latestAmazonBb: amazonBb,
+            latestMargin: secondRound.margin,
+            latestProfit: secondRound.profit
+          });
+        }
         
-      }
         if (updated) updatedProducts.push(updated);
       }
     }
