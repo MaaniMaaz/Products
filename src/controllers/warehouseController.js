@@ -1,6 +1,7 @@
 const SuccessHandler = require("../utils/SuccessHandler");
 const ErrorHandler = require("../utils/ErrorHandler");
 const Warehouse = require("../models/Warehouse");
+const Product = require("../models/Products");
 
 // Create Warehouse
 const createWarehouse = async (req, res) => {
@@ -54,18 +55,24 @@ const deleteWarehouse = async (req, res) => {
   try {
     const { id } = req.params;
 
+    // 1️⃣ Check if the warehouse exists first
     const warehouse = await Warehouse.findById(id);
     if (!warehouse) {
       return ErrorHandler("Warehouse not found", 404, req, res);
     }
 
+    // 2️⃣ Delete all products linked to this warehouse
+    await Product.deleteMany({ warehouse: id });
+
+    // 3️⃣ Delete the warehouse itself
     await warehouse.deleteOne();
 
-    return SuccessHandler({ message: "Warehouse deleted successfully" }, 200, res);
+    return SuccessHandler({ message: "Warehouse and its products deleted successfully" }, 200, res);
   } catch (error) {
     return ErrorHandler(error.message, 500, req, res);
   }
 };
+
 
 // Get All Warehouses
 const getAllWarehouses = async (req, res) => {

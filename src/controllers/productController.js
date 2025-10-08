@@ -17,7 +17,6 @@ const History = require("../models/History");
     const apiKeyId = "8c7b051f-b0ad-4e70-9280-652f4b09c721";
     const apiKeySecret = "eba2d5e86af48563553159bdb996a55439719c243b3325cab30c9aee467866ccb976b0807a98d44421389fddae7ca5aeff136c0a4154a290c3370e3cf9fe2d4c";
 
-
 const createProductByCsv = async (req, res) => {
   try {
     const { warehouse } = req.body;
@@ -132,8 +131,9 @@ const createProductByCsv = async (req, res) => {
     const productsData = apiResponse.data;
     console.log(productsData, "productdata");
 
-    // Save products to database
+    // Save or update products in database
     const savedProducts = [];
+    const updatedProducts = [];
     
     for (const productData of productsData) {
       const originalPrice = toNum(asinToExtras[productData.asin]?.unitCost?.split("$")[1]);
@@ -147,7 +147,7 @@ const createProductByCsv = async (req, res) => {
         amazonFees
       );
 
-      const productToSave = {
+      const productDataPayload = {
         warehouse: warehouse,
         asin: productData.asin,
         name: productData.title,
@@ -162,21 +162,37 @@ const createProductByCsv = async (req, res) => {
         profit: secondRound.profit, // Final profit after capping
         margin: secondRound.margin, // Final margin after capping
         roi: secondRound.roi, // Final ROI after capping
-        createdAt: new Date(),
         updatedAt: new Date()
       };
 
-      const savedProduct = await Product.create(productToSave);
-      savedProducts.push(savedProduct);
+      // Check if product already exists by ASIN
+      const existingProduct = await Product.findOne({ asin: productData.asin });
+
+      if (existingProduct) {
+        // Update existing product
+        const updatedProduct = await Product.findOneAndUpdate(
+          { asin: productData.asin },
+          { $set: productDataPayload },
+          { new: true, runValidators: true }
+        );
+        updatedProducts.push(updatedProduct);
+      } else {
+        // Create new product
+        productData.createdAt = new Date();
+        const newProduct = await Product.create(productDataPayload);
+        savedProducts.push(newProduct);
+      }
     }
 
     return res.status(200).json({
       success: true,
-      message: `Successfully processed ${savedProducts.length} products from CSV`,
+      message: `Successfully processed ${savedProducts.length + updatedProducts.length} products from CSV`,
       data: {
-        totalProcessed: savedProducts.length,
+        totalProcessed: savedProducts.length + updatedProducts.length,
+        newProducts: savedProducts.length,
+        updatedProducts: updatedProducts.length,
         totalAsinsInCsv: asins.length,
-        products: savedProducts
+        products: [...savedProducts, ...updatedProducts]
       }
     });
 
@@ -361,7 +377,7 @@ const deleteProduct = async (req, res) => {
 const getAllProducts = async (req, res) => {
   // #swagger.tags = ['product']
   try {
-    const { title, warehouse, brand, page = 1, limit = 10 } = req.query;
+    const { title, warehouse, brand, page = 1, limit = 10,profitable = false } = req.query;
 
     // Convert pagination values to numbers
     const pageNumber = Math.max(parseInt(page), 1);
@@ -379,6 +395,8 @@ const getAllProducts = async (req, res) => {
       matchStage.brand = { $regex: brand, $options: "i" };
     }
 
+  
+
     // Warehouse filter: support both ObjectId and warehouse name (via lookup)
     let warehouseNameFilter = null;
     if (warehouse) {
@@ -391,7 +409,17 @@ const getAllProducts = async (req, res) => {
 
     // Aggregation pipeline
     const pipeline = [
-      { $match: matchStage },
+       {
+    $addFields: {
+      profitNum: { $toDouble: "$profit" } // convert string -> number
+    }
+  },
+  {
+    $match: {
+      ...matchStage,
+      ...(profitable ? { profitNum: { $gt: 0 } } : {})
+    }
+  },
       {
         $lookup: {
           from: 'warehouses',
