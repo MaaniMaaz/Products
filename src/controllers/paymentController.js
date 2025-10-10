@@ -89,8 +89,8 @@ const createCheckoutSession = async (req, res) => {
       mode: "payment",
 
       // ✅ success/cancel URLs only redirect (no sensitive data)
-      success_url: "https://products-fe-three.vercel.app/dashboard/payment-success",
-      cancel_url: "https://products-fe-three.vercel.app/dashboard/payment-failed",
+      success_url: "https://portal.primewelldistribution.com/dashboard/payment-success",
+      cancel_url: "https://portal.primewelldistribution.com/dashboard/payment-failed",
 
       customer: customerId,
 

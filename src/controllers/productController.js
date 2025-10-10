@@ -377,7 +377,7 @@ const deleteProduct = async (req, res) => {
 const getAllProducts = async (req, res) => {
   // #swagger.tags = ['product']
   try {
-    const { title, warehouse, brand, page = 1, limit = 10,profitable = false } = req.query;
+    const { title, warehouse, brand, page = 1, limit = 10,profitable = false ,proper = false} = req.query;
 
     // Convert pagination values to numbers
     const pageNumber = Math.max(parseInt(page), 1);
@@ -387,13 +387,23 @@ const getAllProducts = async (req, res) => {
     // Build match conditions dynamically
     const matchStage = {};
 
-    if (title) {
-      matchStage.name = { $regex: title, $options: "i" };
-    }
+    
 
     if (brand) {
       matchStage.brand = { $regex: brand, $options: "i" };
     }
+
+    if (proper) {
+  matchStage.name = { $exists: true, $ne: "" };
+  matchStage.amazonBb = { $exists: true, $ne: "", $ne: "0" };
+  matchStage.amazonFees = { $exists: true, $ne: "", $ne: "0" };
+  matchStage.images = { $exists: true, $type: "array", $ne: [], $not: { $size: 0 } };
+}
+
+if (title) {
+      matchStage.name = { $regex: title, $options: "i" };
+    }
+
 
   
 
@@ -471,6 +481,81 @@ const getAllProducts = async (req, res) => {
   }
 };
 
+const getAllProductsForDownload = async (req, res) => {
+  // #swagger.tags = ['product']
+  try {
+    const { warehouse, brand } = req.query;
+
+    // Build match conditions dynamically
+    const matchStage = {};
+
+    // Filter by brand (case-insensitive)
+    if (brand) {
+      matchStage.brand = { $regex: brand, $options: "i" };
+    }
+
+    // Filter by warehouse
+    let warehouseNameFilter = null;
+    if (warehouse) {
+      if (mongoose.Types.ObjectId.isValid(warehouse)) {
+        matchStage.warehouse = new mongoose.Types.ObjectId(warehouse);
+      } else {
+        warehouseNameFilter = warehouse; // Will apply after $lookup
+      }
+    }
+
+    // Aggregation pipeline
+    const pipeline = [
+      {
+        $addFields: {
+          profitNum: { $toDouble: "$profit" }, // Convert profit to number
+        },
+      },
+      {
+        $match: matchStage,
+      },
+      {
+        $lookup: {
+          from: "warehouses",
+          localField: "warehouse",
+          foreignField: "_id",
+          as: "warehouseDoc",
+        },
+      },
+      { $unwind: { path: "$warehouseDoc", preserveNullAndEmptyArrays: true } },
+
+      // Optional warehouse name filter (if warehouse provided as text)
+      ...(warehouseNameFilter
+        ? [
+            {
+              $match: {
+                "warehouseDoc.name": {
+                  $regex: warehouseNameFilter,
+                  $options: "i",
+                },
+              },
+            },
+          ]
+        : []),
+
+      { $sort: { createdAt: -1 } },
+    ];
+
+    const products = await Product.aggregate(pipeline);
+
+    return SuccessHandler(
+      {
+        products,
+        total: products.length,
+      },
+      200,
+      res
+    );
+  } catch (error) {
+    return ErrorHandler(error.message, 500, req, res);
+  }
+};
+
 
 
 // Get Single Product
@@ -495,6 +580,7 @@ module.exports = {
   updateProduct,
   deleteProduct,
   getAllProducts,
+  getAllProductsForDownload,
   getProductById,
   createProductByCsv,
   updateProductsFromAPI
