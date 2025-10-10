@@ -398,3 +398,7 @@
 {"date":"2025-10-06T16:42:39.069Z","level":"error","message":"User email is not verified","method":"POST","service":"user-service","url":"/login"}
 {"date":"2025-10-06T16:44:30.617Z","level":"error","message":"User email is not verified","method":"POST","service":"user-service","url":"/login"}
 {"date":"2025-10-07T14:42:51.237Z","level":"error","message":"E11000 duplicate key error collection: products.products index: asin_1 dup key: { asin: \"B0CCBXRYRC\" }","method":"POST","service":"user-service","url":"/csv"}
+{"date":"2025-10-08T07:32:38.283Z","level":"error","message":"Cannot access 'productData' before initialization","method":"POST","service":"user-service","url":"/csv"}
+{"date":"2025-10-10T10:38:26.905Z","level":"error","message":"Invalid credentials","method":"POST","service":"user-service","url":"/login"}
+{"date":"2025-10-10T11:40:25.467Z","level":"error","message":"Cannot read properties of null (reading 'name')","method":"POST","service":"user-service","url":"/checkout"}
+{"date":"2025-10-10T11:41:26.277Z","level":"error","message":"Cannot read properties of null (reading 'name')","method":"POST","service":"user-service","url":"/checkout"}

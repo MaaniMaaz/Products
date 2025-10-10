@@ -62,17 +62,13 @@ const deleteWarehouse = async (req, res) => {
       return ErrorHandler("Warehouse not found", 404, req, res);
     }
 
-    // 2️⃣ Find all products in this warehouse
-    const products = await Product.find({ warehouse: id });
-    const productIds = products.map(p => p._id);
-
-    // 3️⃣ Delete all histories related to those products
-    if (productIds.length > 0) {
-      await History.deleteMany({ product: { $in: productIds } });
-    }
+  
 
     // 4️⃣ Delete all products linked to this warehouse
-    await Product.deleteMany({ warehouse: id });
+      await Product.updateMany(
+      { warehouse: id },         
+      { $set: { isDeleted: true } }  
+    );
 
     // 5️⃣ Delete the warehouse itself
     await warehouse.deleteOne();

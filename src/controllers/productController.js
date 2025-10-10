@@ -134,6 +134,11 @@ const createProductByCsv = async (req, res) => {
     // Save or update products in database
     const savedProducts = [];
     const updatedProducts = [];
+
+   await Product.updateMany(
+  { warehouse: warehouse },         
+  { $set: { isDeleted: true } }  
+);
     
     for (const productData of productsData) {
       const originalPrice = toNum(asinToExtras[productData.asin]?.unitCost?.split("$")[1]);
@@ -166,22 +171,22 @@ const createProductByCsv = async (req, res) => {
       };
 
       // Check if product already exists by ASIN
-      const existingProduct = await Product.findOne({ asin: productData.asin });
+      // const existingProduct = await Product.findOne({ asin: productData.asin });
 
-      if (existingProduct) {
-        // Update existing product
-        const updatedProduct = await Product.findOneAndUpdate(
-          { asin: productData.asin },
-          { $set: productDataPayload },
-          { new: true, runValidators: true }
-        );
-        updatedProducts.push(updatedProduct);
-      } else {
+      // if (existingProduct) {
+      //   // Update existing product
+      //   const updatedProduct = await Product.findOneAndUpdate(
+      //     { asin: productData.asin },
+      //     { $set: productDataPayload },
+      //     { new: true, runValidators: true }
+      //   );
+      //   updatedProducts.push(updatedProduct);
+      // } else {
         // Create new product
         productData.createdAt = new Date();
         const newProduct = await Product.create(productDataPayload);
         savedProducts.push(newProduct);
-      }
+      // }
     }
 
     return res.status(200).json({
@@ -385,7 +390,7 @@ const getAllProducts = async (req, res) => {
     const skip = (pageNumber - 1) * pageSize;
 
     // Build match conditions dynamically
-    const matchStage = {};
+    const matchStage = {isDeleted:false};
 
     
 

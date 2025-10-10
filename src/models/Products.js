@@ -25,7 +25,7 @@ const productsSchema = new Schema(
     },
     asin:{
        type:String,
-       unique:true,
+      //  unique:true,
        default:"-"
     },
     amazonBb:{
@@ -52,6 +52,11 @@ const productsSchema = new Schema(
     price: {
       type:String,
        default:"-"
+    },
+    
+    isDeleted: {
+      type:Boolean,
+       default:false
     },
     originalPrice: {
       type:String,

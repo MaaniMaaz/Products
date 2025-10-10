@@ -63,42 +63,88 @@ const createCheckoutSession = async (req, res) => {
 
     // order.save()
 
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ["us_bank_account", "customer_balance"],
+  const orderDetails = await Order.findById(_id).populate("products.product");
+console.log(orderDetails);
 
-      payment_method_options: {
-        customer_balance: {
-          funding_type: "bank_transfer",
-          bank_transfer: {
-            type: "us_bank_transfer",
-          },
-        },
+// Prepare line items from order products
+const lineItems = orderDetails.products.map(item => ({
+  price_data: {
+    currency: "usd",
+    product_data: {
+      name: item.product?.name || item.productId || "Product",
+      description: item.product?.description || undefined,
+      // images: item.product?.image ? [item.product.image] : undefined,
+    },
+    unit_amount: Math.round(item.unitPrice * 100), // Convert to cents
+  },
+  quantity: item.qnt || item.quantity || 1,
+}));
+
+// ✅ Optional: Add Tax
+if (orderDetails.tax && orderDetails.tax > 0) {
+  lineItems.push({
+    price_data: {
+      currency: "usd",
+      product_data: { name: "Tax" },
+      unit_amount: Math.round(orderDetails.tax * 100),
+    },
+    quantity: 1,
+  });
+}
+
+// ✅ Add Prep Charges (if applicable)
+const prepEligibleProducts = orderDetails.products.filter(
+  (item) => item.preference?.prepRequired?.toLowerCase() !== "no prep"
+);
+
+if (prepEligibleProducts.length > 0) {
+  const totalPrepQty = prepEligibleProducts.reduce(
+    (sum, item) => sum + (item.qnt || item.quantity || 1),
+    0
+  );
+
+  // e.g., $2 prep charge per item (you can adjust)
+  const PREP_CHARGE_PER_ITEM = 1; // USD
+
+  lineItems.push({
+    price_data: {
+      currency: "usd",
+      product_data: {
+        name: "Prep Charges",
+        description: `Prep charges for ${totalPrepQty} item(s)`,
       },
+      unit_amount: Math.round(PREP_CHARGE_PER_ITEM * 100), // per item in cents
+    },
+    quantity: totalPrepQty,
+  });
+}
 
-      line_items: [
-        {
-          price_data: {
-            currency: "usd",
-            product_data: { name: "Example Product" },
-            unit_amount: Number(totalPrice) * 100,
-          },
-          quantity: 1,
-        },
-      ],
+// ✅ Create Stripe Checkout Session
+const session = await stripe.checkout.sessions.create({
+  payment_method_types: ["us_bank_account", "customer_balance"],
+  payment_method_options: {
+    customer_balance: {
+      funding_type: "bank_transfer",
+      bank_transfer: { type: "us_bank_transfer" },
+    },
+  },
+  line_items: lineItems,
+  mode: "payment",
+  success_url:
+    "https://portal.primewelldistribution.com/dashboard/payment-success?session_id={CHECKOUT_SESSION_ID}",
+  cancel_url:
+    "https://portal.primewelldistribution.com/dashboard/payment-failed",
+  customer: customerId,
+  metadata: {
+    orderId: _id.toString(),
+    totalPrice: orderDetails.totalPrice.toString(),
+  },
+  payment_intent_data: {
+    metadata: { orderId: _id.toString() },
+    description: `Order #${_id.toString().slice(-8)}`,
+  },
+});
 
-      mode: "payment",
-
-      // ✅ success/cancel URLs only redirect (no sensitive data)
-      success_url: "https://portal.primewelldistribution.com/dashboard/payment-success",
-      cancel_url: "https://portal.primewelldistribution.com/dashboard/payment-failed",
-
-      customer: customerId,
-
-      // ✅ Store the full request body as metadata (must be strings)
-       metadata: {
-        orderId: _id.toString(),
-      },
-    });
 
     return res.status(200).json({ url: session.url });
   } catch (error) {
