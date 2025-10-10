@@ -489,10 +489,10 @@ if (title) {
 const getAllProductsForDownload = async (req, res) => {
   // #swagger.tags = ['product']
   try {
-    const { warehouse, brand } = req.query;
+    const { title,warehouse, brand } = req.query;
 
     // Build match conditions dynamically
-    const matchStage = {};
+    const matchStage = {isDeleted:false,profitNum: { $gt: 0 }};
 
     // Filter by brand (case-insensitive)
     if (brand) {
@@ -507,6 +507,10 @@ const getAllProductsForDownload = async (req, res) => {
       } else {
         warehouseNameFilter = warehouse; // Will apply after $lookup
       }
+    }
+
+    if (title) {
+      matchStage.name = { $regex: title, $options: "i" };
     }
 
     // Aggregation pipeline
