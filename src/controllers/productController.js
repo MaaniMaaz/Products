@@ -124,7 +124,8 @@ const createProductByCsv = async (req, res) => {
     // Fetch product data from API
     const apiResponse = await axios.post(
       `https://app.apexapplications.io/api/data/get-asins-info`,
-      { asins: asins },
+      { asins: ["B0DZX7D27V"] },
+      // { asins: asins },
       { headers }
     );
 
