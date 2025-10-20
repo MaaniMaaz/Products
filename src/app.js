@@ -135,7 +135,7 @@ const updateProducts = new CronJob(
     console.log("⏰ Running daily product update job...");
 
     // Call your update API (assuming backend runs locally on port 5000)
-    await axios.get("https://products-s9xv.onrender.com/product/update-product");
+    await axios.get("https://portal.primewelldistribution.com/api/product/update-product");
 
     console.log("✅ Product update completed");
   } catch (error) {
@@ -144,7 +144,7 @@ const updateProducts = new CronJob(
   },
   null,
   true,
-  // "America/Los_Angeles"
+  "Asia/Karachi"
 );
 
 updateProducts.start();

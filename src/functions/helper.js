@@ -5,6 +5,18 @@ const toNum = (v) => {
   return m ? Number(m[0]) : 0;
 };
 
+const parseUnitCost = (value) => {
+  if (!value) return null;
+  
+  const strValue = String(value).trim();
+  
+  // Remove dollar sign if present
+  const cleanValue = strValue.replace(/^\$/, '');
+  
+  // Return the numeric value
+  return cleanValue;
+};
+
 const calcMetrics = (basePrice, amazonBb, amazonFees) => {
   const profit = amazonBb - (basePrice + amazonFees);
   const margin = amazonBb > 0 ? (profit / amazonBb) * 100 : 0;
@@ -49,5 +61,6 @@ const applyRoiCapWithHistory = (basePrice0, amazonBb, amazonFees) => {
 module.exports = {
   toNum,
   calcMetrics,
-  applyRoiCapWithHistory
+  applyRoiCapWithHistory,
+  parseUnitCost
 };

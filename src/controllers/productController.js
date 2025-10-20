@@ -1,4 +1,4 @@
-const {  toNum, applyRoiCapWithHistory } = require("../functions/helper");
+const {  toNum, applyRoiCapWithHistory, parseUnitCost } = require("../functions/helper");
 
 const SuccessHandler = require("../utils/SuccessHandler");
 const ErrorHandler = require("../utils/ErrorHandler");
@@ -9,7 +9,6 @@ const csv = require('csv-parser');
 const fs = require('fs');
 const path = require('path');
 const Papa = require('papaparse'); // Better alternative for CSV parsing
-const { Readable } = require('stream');
 const mongoose = require("mongoose");
 const History = require("../models/History");
 
@@ -142,7 +141,7 @@ const createProductByCsv = async (req, res) => {
 );
     
     for (const productData of productsData) {
-      const originalPrice = toNum(asinToExtras[productData.asin]?.unitCost?.split("$")[1]);
+      const originalPrice = toNum(parseUnitCost(asinToExtras[productData.asin]?.unitCost));
       const amazonBb = toNum(productData?.price);
       const amazonFees = toNum(productData?.fees);
 
@@ -187,6 +186,27 @@ const createProductByCsv = async (req, res) => {
         productData.createdAt = new Date();
         const newProduct = await Product.create(productDataPayload);
         savedProducts.push(newProduct);
+
+        if (isCapped) {
+          const history = await History.create({
+            product: singleProductDetail?._id,
+            asin: singleProductDetail?.asin,
+            // Previous values (first round - before capping)
+            prevPrice: singleProductDetail.originalPrice,
+            prevRoi: firstRound.roi,
+            prevAmazonFees: singleProductDetail?.amazonFees,
+            prevAmazonBb: singleProductDetail?.amazonBb,
+            prevMargin: firstRound.margin,
+            prevProfit: firstRound.profit,
+            // Latest values (second round - after capping)
+            latestPrice: secondRound.basePrice,
+            latestRoi: secondRound.roi,
+            latestAmazonFees: amazonFees,
+            latestAmazonBb: amazonBb,
+            latestMargin: secondRound.margin,
+            latestProfit: secondRound.profit
+          });
+        }
       // }
     }
 
