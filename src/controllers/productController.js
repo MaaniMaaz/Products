@@ -74,6 +74,19 @@ const createProductByCsv = async (req, res) => {
       return strValue;
     };
 
+    // Function to parse Unit Cost (handles $ sign)
+    const parseUnitCost = (value) => {
+      if (!value) return null;
+      
+      const strValue = String(value).trim();
+      
+      // Remove dollar sign if present
+      const cleanValue = strValue.replace(/^\$/, '');
+      
+      // Return the numeric value
+      return cleanValue;
+    };
+
     // Parse CSV using Papa Parse
     const parseResult = Papa.parse(csvData, {
       header: true,
@@ -123,7 +136,6 @@ const createProductByCsv = async (req, res) => {
     // Fetch product data from API
     const apiResponse = await axios.post(
       `https://app.apexapplications.io/api/data/get-asins-info`,
-      // { asins: ["B0DZX7D27V"] },
       { asins: asins },
       { headers }
     );
@@ -135,10 +147,11 @@ const createProductByCsv = async (req, res) => {
     const savedProducts = [];
     const updatedProducts = [];
 
-   await Product.updateMany(
-  { warehouse: warehouse },         
-  { $set: { isDeleted: true } }  
-);
+    // Mark all existing products in this warehouse as deleted
+    await Product.updateMany(
+      { warehouse: warehouse },         
+      { $set: { isDeleted: true } }  
+    );
     
     for (const productData of productsData) {
       const originalPrice = toNum(parseUnitCost(asinToExtras[productData.asin]?.unitCost));
@@ -167,35 +180,26 @@ const createProductByCsv = async (req, res) => {
         profit: secondRound.profit, // Final profit after capping
         margin: secondRound.margin, // Final margin after capping
         roi: secondRound.roi, // Final ROI after capping
+        isDeleted: false,
+        createdAt: new Date(),
         updatedAt: new Date()
       };
 
-      // Check if product already exists by ASIN
-      // const existingProduct = await Product.findOne({ asin: productData.asin });
+      // Create new product
+      const newProduct = await Product.create(productDataPayload);
+      savedProducts.push(newProduct);
 
-      // if (existingProduct) {
-      //   // Update existing product
-      //   const updatedProduct = await Product.findOneAndUpdate(
-      //     { asin: productData.asin },
-      //     { $set: productDataPayload },
-      //     { new: true, runValidators: true }
-      //   );
-      //   updatedProducts.push(updatedProduct);
-      // } else {
-        // Create new product
-        productData.createdAt = new Date();
-        const newProduct = await Product.create(productDataPayload);
-        savedProducts.push(newProduct);
-
-        if (isCapped) {
-          const history = await History.create({
-            product: singleProductDetail?._id,
-            asin: singleProductDetail?.asin,
+      // Create history record if ROI was capped
+      if (isCapped) {
+        try {
+          await History.create({
+            product: newProduct._id,
+            asin: newProduct.asin,
             // Previous values (first round - before capping)
-            prevPrice: singleProductDetail.originalPrice,
+            prevPrice: originalPrice,
             prevRoi: firstRound.roi,
-            prevAmazonFees: singleProductDetail?.amazonFees,
-            prevAmazonBb: singleProductDetail?.amazonBb,
+            prevAmazonFees: amazonFees,
+            prevAmazonBb: amazonBb,
             prevMargin: firstRound.margin,
             prevProfit: firstRound.profit,
             // Latest values (second round - after capping)
@@ -206,8 +210,11 @@ const createProductByCsv = async (req, res) => {
             latestMargin: secondRound.margin,
             latestProfit: secondRound.profit
           });
+        } catch (historyError) {
+          console.error('Error creating history for ASIN:', newProduct.asin, historyError);
+          // Continue processing even if history creation fails
         }
-      // }
+      }
     }
 
     return res.status(200).json({
