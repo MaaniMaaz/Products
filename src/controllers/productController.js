@@ -434,8 +434,12 @@ const getAllProducts = async (req, res) => {
 }
 
 if (title) {
-      matchStage.name = { $regex: title, $options: "i" };
-    }
+  matchStage.$or = [
+    { asin: { $regex: title, $options: "i" } },
+    { name: { $regex: title, $options: "i" } }
+  ];
+}
+
 
 
   
